@@ -1,0 +1,153 @@
+---
+title: "R example - Housing development in Iceland"
+author: "Sigríður Ösp Sigurðardóttir"
+date: "01/03/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### Reading table and adjustments to data
+```{r}
+
+library(forcats)
+library(ggplot2)
+library(dplyr)
+
+sos <- read.table("husnaedisverd_2017.csv", encoding = "UTF-8",  header=TRUE, sep=";")
+sos$matssvaedi <- factor(sos$matssvaedi)
+sos$undirmatssvaedi <- factor(sos$undirmatssvaedi)
+```
+
+```{r}
+sos$kaupverd <- paste0(sos$kaupverd, "000")
+sos$kaupverd <- as.numeric(sos$kaupverd)
+```
+
+#### New Variables created
+```{r}
+sos$fermetraverd <- c(sos$kaupverd/sos$birtm2)
+
+sos$teg_eign_grof <- fct_recode(sos$teg_eign,  Sérbýli = "Einbýlishús", Íbúð = "Íbúðareign", Sérbýli = "Parhús", Sérbýli = "Raðhús")
+```
+
+#### New dataframe eignir created consisting of housing in three towns
+```{r}
+eignir <- dplyr::filter(sos, svfn%in%c("1400", "2000", "6000"))
+```
+
+#### Town codes replaced with names
+```{r}
+eignir$svfn <- factor(eignir$svfn)
+eignir$svfn <- fct_recode(eignir$svfn, Hafnarfjörður="1400", Reykjanesbær = "2000", Akureyri = "6000")
+```
+
+#### Number of premisises in each town
+```{r}
+ggplot(data=eignir, aes(svfn)) + geom_bar() + xlab("Town") + ylab("Num premises") + ggtitle("Premisises per town")
+```
+
+
+#### Number of premises split into houses and apartments
+```{r}
+ggplot(data=eignir, aes(svfn, fill=teg_eign_grof)) + geom_bar() + xlab("Town") + ylab("Num premises") + labs(fill = "Type of housing") + ggtitle("Premisises per town")
+```
+
+#### Median and average found for number of premisises by price per square meter
+###### Mean: Red, Average: Blue
+```{r}
+options(scipen=10000)
+ggplot(data=eignir, aes(fermetraverd, fill=)) + geom_histogram(bins = 20) + xlab("Price per sqm") + ylab("Num premises") + geom_vline(aes(xintercept = mean(fermetraverd, na.rm=T)),col='red',size=1) + geom_vline(aes(xintercept = median(fermetraverd, na.rm=T)),col='blue',size=1) + ggtitle("Number of premises by price per sqm")
+```
+
+**Mean:**
+`r mean(eignir$fermetraverd, na.rm=T)`
+
+**Median:**
+`r median(eignir$fermetraverd, na.rm=T)`
+
+#### Number of premises by price
+```{r}
+ggplot(data=eignir, aes(kaupverd)) + geom_histogram(bins=20) + xlab("Price") + ylab("Num premises") + geom_vline(aes(xintercept = mean(kaupverd, na.rm=T)),col='red',size=1) + geom_vline(aes(xintercept = median(kaupverd, na.rm=T)),col='blue',size=1) + ggtitle("Number of premises by price")
+```
+
+**Mean:**
+`r mean(eignir$kaupverd, na.rm=T)`
+
+**Median:**
+`r median(eignir$kaupverd, na.rm=T)`
+
+
+#### Number of premises in each town by year built
+```{r}
+ggplot(data=eignir, aes(byggar, fill=svfn)) + geom_histogram(bins=20) + xlab("Year built") + ylab("Num premises") + labs(fill = "Town") + ggtitle("Premises by year built")
+
+```
+
+
+#### Number of houses by size
+```{r}
+ggplot(data=dplyr::filter(eignir, teg_eign_grof%in%c("Sérbýli")), aes(birtm2, fill=svfn)) + geom_histogram(bins=20) + xlab("Size (sqm)") + ylab("Num houses") + labs(fill = "Town") + ggtitle("Number of houses by size")
+```
+
+
+#### Number of apartments by price per square meter
+```{r}
+ggplot(data=dplyr::filter(eignir, teg_eign_grof%in%c("Íbúð")), aes(fermetraverd, fill=svfn)) + geom_histogram(bins=20) + xlab("price per sqm") + ylab("Num apartments") + labs(fill = "Town") + ggtitle("Number of apartments by price per square meter")
+```
+
+
+#### Comparison of size of premises and full price by town
+```{r}
+ggplot(data=eignir, aes(x=birtm2, y=kaupverd, color=svfn)) + geom_point() + xlab("Premises size") + ylab("Price") + labs(color = "Town") + facet_grid(. ~ svfn) + ggtitle("Comparison of size of premises and price")
+```
+
+#### Number of bathtubs and showers in premises by year built
+###### This was more of an experiment and still has some errors
+```{r}
+nuverold <- sos[sos$byggar>1949,]
+
+ggplot(nuverold %>% group_by(byggar) %>% 
+         summarise(fjbkar=mean(fjbkar)), 
+       aes(x = byggar, y = fjbkar)) +  geom_line(colour="blue", linetype="11", size=0.3, na.rm = TRUE) + geom_point(shape=4, colour="blue", size=3, na.rm = TRUE) + xlab("Year") + ylab("Bathtub average") + scale_x_continuous(breaks = seq(1950,2020,10)) + ggtitle("Number of bathtubs in premises by year built")
+
+ggplot(nuverold %>% group_by(byggar) %>% 
+         summarise(fjsturt=mean(fjsturt)), 
+       aes(x = byggar, y = fjsturt)) +  geom_line(colour="blue", linetype="11", size=0.3, na.rm = TRUE) + geom_point(shape=4, colour="blue", size=3, na.rm = TRUE) + xlab("Year") + ylab("Shower average") + scale_x_continuous(breaks = seq(1950,2020,10)) + ggtitle("Number of showers in premises by year built")
+       
+```
+
+
+#### Tables of the three towns by type of premises
+```{r}
+table(eignir$svfn, eignir$teg_eign_grof)
+```
+
+```{r}
+prop.table(table(eignir$svfn, eignir$teg_eign_grof), margin=1)
+```
+
+#### tapply summaries
+```{r}
+tapply(eignir$fermetraverd, eignir$svfn, summary, na.rm=TRUE)
+
+```
+
+```{r}
+serb <- dplyr::filter(eignir, teg_eign_grof%in%c("Sérbýli"))
+tapply(eignir$birtm2, eignir$svfn, summary, na.rm=TRUE)
+
+```
+
+
+
+
+
+
+
+
+
+
+
